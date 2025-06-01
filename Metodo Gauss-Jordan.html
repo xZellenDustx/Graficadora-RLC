@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resolver de Circuitos - Método Gauss-Jordan</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f7fa;
+        }
+        
+        h1, h2, h3 {
+            color: #2c3e50;
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #3498db;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        
+        .container {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 25px;
+            margin-bottom: 30px;
+        }
+        
+        .input-section {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .matrix-input {
+            flex: 1;
+            min-width: 300px;
+        }
+        
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 15px 0;
+        }
+        
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }
+        
+        th {
+            background-color: #3498db;
+            color: white;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        
+        input {
+            width: 60px;
+            padding: 5px;
+            text-align: center;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover {
+            background-color: #2980b9;
+        }
+        
+        .steps-container {
+            margin-top: 30px;
+        }
+        
+        .step {
+            background-color: #f8f9fa;
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 0 4px 4px 0;
+        }
+        
+        .step-title {
+            font-weight: bold;
+            color: #3498db;
+            margin-bottom: 10px;
+        }
+        
+        .matrix {
+            font-family: monospace;
+            white-space: pre;
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        
+        .solution {
+            background-color: #e8f4fc;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 20px;
+        }
+        
+        .verification {
+            background-color: #e8f8f0;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 20px;
+        }
+        
+        .error {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        
+        .success {
+            color: #27ae60;
+            font-weight: bold;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Resolver de Circuitos Eléctricos - Método Gauss-Jordan</h1>
+    
+    <div class="container">
+        <h2>Ingrese los parámetros del circuito</h2>
+        
+        <div class="input-section">
+            <div class="matrix-input">
+                <h3>Matriz de resistencias (A)</h3>
+                <table id="matrix-a">
+                    <tbody>
+                        <!-- Se generará dinámicamente -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="matrix-input">
+                <h3>Vector de voltajes (b)</h3>
+                <table id="vector-b">
+                    <tbody>
+                        <!-- Se generará dinámicamente -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div>
+            <label for="size">Número de mallas:</label>
+            <input type="number" id="size" min="1" max="10" value="3" onchange="updateMatrixSize()">
+        </div>
+        
+        <div class="controls">
+            <button onclick="solveSystem()">Resolver Sistema</button>
+            <button onclick="loadExample()">Cargar Ejemplo</button>
+            <button onclick="clearAll()">Limpiar Todo</button>
+        </div>
+    </div>
+    
+    <div id="results-container" class="container" style="display: none;">
+        <h2>Resultados</h2>
+        
+        <div id="steps-container" class="steps-container">
+            <!-- Los pasos se mostrarán aquí -->
+        </div>
+        
+        <div id="solution" class="solution">
+            <!-- La solución final se mostrará aquí -->
+        </div>
+        
+        <div id="verification" class="verification">
+            <!-- La verificación física se mostrará aquí -->
+        </div>
+    </div>
+    
+    <script>
+        // Tamaño inicial del sistema
+        let systemSize = 3;
+        
+        // Inicializar la interfaz
+        document.addEventListener('DOMContentLoaded', function() {
+            updateMatrixSize();
+        });
+        
+        // Actualizar el tamaño de las matrices
+        function updateMatrixSize() {
+            systemSize = parseInt(document.getElementById('size').value);
+            
+            // Generar matriz A
+            let matrixA = document.getElementById('matrix-a').getElementsByTagName('tbody')[0];
+            matrixA.innerHTML = '';
+            
+            for (let i = 0; i < systemSize; i++) {
+                let row = document.createElement('tr');
+                
+                for (let j = 0; j < systemSize; j++) {
+                    let cell = document.createElement('td');
+                    let input = document.createElement('input');
+                    input.type = 'number';
+                    input.id = `a-${i}-${j}`;
+                    input.step = 'any';
+                    input.value = '0';
+                    cell.appendChild(input);
+                    row.appendChild(cell);
+                }
+                
+                matrixA.appendChild(row);
+            }
+            
+            // Generar vector b
+            let vectorB = document.getElementById('vector-b').getElementsByTagName('tbody')[0];
+            vectorB.innerHTML = '';
+            
+            for (let i = 0; i < systemSize; i++) {
+                let row = document.createElement('tr');
+                let cell = document.createElement('td');
+                let input = document.createElement('input');
+                input.type = 'number';
+                input.id = `b-${i}`;
+                input.step = 'any';
+                input.value = '0';
+                cell.appendChild(input);
+                row.appendChild(cell);
+                vectorB.appendChild(row);
+            }
+        }
+        
+        // Cargar un ejemplo predefinido
+        function loadExample() {
+            systemSize = 3;
+            document.getElementById('size').value = '3';
+            updateMatrixSize();
+            
+            // Matriz de ejemplo (3 mallas)
+            document.getElementById('a-0-0').value = '5';
+            document.getElementById('a-0-1').value = '-3';
+            document.getElementById('a-0-2').value = '0';
+            document.getElementById('a-1-0').value = '-3';
+            document.getElementById('a-1-1').value = '8';
+            document.getElementById('a-1-2').value = '-4';
+            document.getElementById('a-2-0').value = '0';
+            document.getElementById('a-2-1').value = '-4';
+            document.getElementById('a-2-2').value = '4';
+            
+            // Vector de ejemplo
+            document.getElementById('b-0').value = '10';
+            document.getElementById('b-1').value = '0';
+            document.getElementById('b-2').value = '-5';
+        }
+        
+        // Limpiar todos los campos
+        function clearAll() {
+            let inputs = document.querySelectorAll('input[type="number"]');
+            inputs.forEach(input => {
+                input.value = '0';
+            });
+            
+            document.getElementById('results-container').style.display = 'none';
+            document.getElementById('steps-container').innerHTML = '';
+            document.getElementById('solution').innerHTML = '';
+            document.getElementById('verification').innerHTML = '';
+        }
+        
+        // Resolver el sistema
+        function solveSystem() {
+            // Obtener los datos de las matrices
+            let A = [];
+            let b = [];
+            
+            for (let i = 0; i < systemSize; i++) {
+                A[i] = [];
+                for (let j = 0; j < systemSize; j++) {
+                    A[i][j] = parseFloat(document.getElementById(`a-${i}-${j}`).value);
+                }
+                b[i] = parseFloat(document.getElementById(`b-${i}`).value);
+            }
+            
+            // Mostrar el contenedor de resultados
+            document.getElementById('results-container').style.display = 'block';
+            document.getElementById('steps-container').innerHTML = '';
+            document.getElementById('solution').innerHTML = '';
+            document.getElementById('verification').innerHTML = '';
+            
+            // Resolver usando Gauss-Jordan
+            gaussJordanSolve(A, b);
+        }
+        
+        // Implementación del método de Gauss-Jordan
+        function gaussJordanSolve(A, b) {
+            let n = b.length;
+            let M = [];
+            let steps = [];
+            
+            // Crear matriz aumentada
+            for (let i = 0; i < n; i++) {
+                M[i] = [...A[i]];
+                M[i].push(b[i]);
+            }
+            
+            // Paso inicial
+            steps.push({
+                title: "Matriz inicial (A|b)",
+                matrix: JSON.parse(JSON.stringify(M)),
+                operation: ""
+            });
+            
+            // Proceso de eliminación
+            for (let col = 0; col < n; col++) {
+                // Pivoteo parcial
+                let maxRow = col;
+                for (let i = col + 1; i < n; i++) {
+                    if (Math.abs(M[i][col]) > Math.abs(M[maxRow][col])) {
+                        maxRow = i;
+                    }
+                }
+                
+                if (maxRow !== col) {
+                    // Intercambiar filas
+                    [M[col], M[maxRow]] = [M[maxRow], M[col]];
+                    
+                    steps.push({
+                        title: `Paso ${col+1}.1: Intercambio de filas ${col+1} ↔ ${maxRow+1}`,
+                        matrix: JSON.parse(JSON.stringify(M)),
+                        operation: `Intercambio F${col+1} ↔ F${maxRow+1}`
+                    });
+                }
+                
+                // Normalizar fila pivote
+                let pivot = M[col][col];
+                if (pivot === 0) {
+                    showError("El sistema no tiene solución única (pivote cero)");
+                    return;
+                }
+                
+                for (let j = col; j <= n; j++) {
+                    M[col][j] /= pivot;
+                }
+                
+                steps.push({
+                    title: `Paso ${col+1}.2: Normalizar fila ${col+1} (dividir por ${pivot.toFixed(4)})`,
+                    matrix: JSON.parse(JSON.stringify(M)),
+                    operation: `F${col+1} = F${col+1} / ${pivot.toFixed(4)}`
+                });
+                
+                // Eliminar en otras filas
+                for (let row = 0; row < n; row++) {
+                    if (row !== col && M[row][col] !== 0) {
+                        let factor = M[row][col];
+                        for (let j = col; j <= n; j++) {
+                            M[row][j] -= factor * M[col][j];
+                        }
+                        
+                        steps.push({
+                            title: `Paso ${col+1}.3: Eliminar en fila ${row+1} (restar ${factor.toFixed(4)} × F${col+1})`,
+                            matrix: JSON.parse(JSON.stringify(M)),
+                            operation: `F${row+1} = F${row+1} - ${factor.toFixed(4)} × F${col+1}`
+                        });
+                    }
+                }
+            }
+            
+            // Mostrar todos los pasos
+            displaySteps(steps);
+            
+            // Extraer solución
+            let solution = [];
+            for (let i = 0; i < n; i++) {
+                solution[i] = M[i][n];
+            }
+            
+            // Mostrar solución
+            displaySolution(solution);
+            
+            // Verificación física
+            verifySolution(A, b, solution);
+        }
+        
+        // Mostrar los pasos del cálculo
+        function displaySteps(steps) {
+            let stepsContainer = document.getElementById('steps-container');
+            stepsContainer.innerHTML = '<h3>Procedimiento Paso a Paso</h3>';
+            
+            steps.forEach((step, index) => {
+                let stepDiv = document.createElement('div');
+                stepDiv.className = 'step';
+                
+                let title = document.createElement('div');
+                title.className = 'step-title';
+                title.textContent = step.title;
+                stepDiv.appendChild(title);
+                
+                if (step.operation) {
+                    let operation = document.createElement('div');
+                    operation.textContent = `Operación: ${step.operation}`;
+                    operation.style.marginBottom = '10px';
+                    operation.style.fontStyle = 'italic';
+                    stepDiv.appendChild(operation);
+                }
+                
+                let matrixDiv = document.createElement('div');
+                matrixDiv.className = 'matrix';
+                
+                let matrixText = '';
+                for (let i = 0; i < step.matrix.length; i++) {
+                    matrixText += '| ';
+                    for (let j = 0; j < step.matrix[i].length - 1; j++) {
+                        matrixText += step.matrix[i][j].toFixed(4).padStart(8) + ' ';
+                    }
+                    matrixText += '| ' + step.matrix[i][step.matrix[i].length - 1].toFixed(4).padStart(8) + ' |\n';
+                }
+                
+                matrixDiv.textContent = matrixText;
+                stepDiv.appendChild(matrixDiv);
+                
+                stepsContainer.appendChild(stepDiv);
+            });
+        }
+        
+        // Mostrar la solución final
+        function displaySolution(solution) {
+            let solutionDiv = document.getElementById('solution');
+            solutionDiv.innerHTML = '<h3>Solución del Sistema</h3>';
+            
+            let solutionText = '';
+            for (let i = 0; i < solution.length; i++) {
+                solutionText += `Corriente I<sub>${i+1}</sub> = ${solution[i].toFixed(4)} A<br>`;
+            }
+            
+            solutionDiv.innerHTML += solutionText;
+        }
+        
+        // Verificar la solución físicamente
+        function verifySolution(A, b, solution) {
+            let verificationDiv = document.getElementById('verification');
+            verificationDiv.innerHTML = '<h3>Verificación Física</h3>';
+            
+            let verificationText = '';
+            let allValid = true;
+            
+            for (let i = 0; i < b.length; i++) {
+                let sum = 0;
+                for (let j = 0; j < solution.length; j++) {
+                    sum += A[i][j] * solution[j];
+                }
+                
+                let diff = Math.abs(sum - b[i]);
+                let isValid = diff < 0.001; // Tolerancia pequeña para errores de redondeo
+                
+                if (!isValid) allValid = false;
+                
+                verificationText += `Malla ${i+1}: `;
+                for (let j = 0; j < solution.length; j++) {
+                    if (A[i][j] !== 0) {
+                        verificationText += `${A[i][j].toFixed(2)} × ${solution[j].toFixed(4)}`;
+                        if (j < solution.length - 1) verificationText += ' + ';
+                    }
+                }
+                verificationText += ` = ${sum.toFixed(4)} (Debe ser ≈ ${b[i].toFixed(4)})`;
+                
+                if (isValid) {
+                    verificationText += ' <span class="success">✓</span>';
+                } else {
+                    verificationText += ' <span class="error">✗</span>';
+                }
+                
+                verificationText += '<br>';
+            }
+            
+            verificationDiv.innerHTML += verificationText;
+            
+            if (allValid) {
+                verificationDiv.innerHTML += '<p class="success">Todas las ecuaciones se satisfacen correctamente.</p>';
+            } else {
+                verificationDiv.innerHTML += '<p class="error">Algunas ecuaciones no se satisfacen completamente (posibles errores de redondeo).</p>';
+            }
+        }
+        
+        // Mostrar mensaje de error
+        function showError(message) {
+            document.getElementById('solution').innerHTML = `<p class="error">Error: ${message}</p>`;
+        }
+    </script>
+</body>
+</html>
